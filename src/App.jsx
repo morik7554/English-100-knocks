@@ -123,11 +123,64 @@ const INTERNAL_DATA = {
  * 【2. 定数・設定】
  * ============================================================
  */
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'english-100-knock-v3';
+const getImportMetaEnv = () => {
+  try {
+    return import.meta?.env ?? {};
+  } catch (e) {
+    return {};
+  }
+};
+
+const readEnv = (key, fallback = undefined) => {
+  const env = getImportMetaEnv();
+  if (env && Object.prototype.hasOwnProperty.call(env, key)) return env[key];
+  return fallback;
+};
+
+const firebaseConfigRaw =
+  (typeof __firebase_config !== 'undefined' && __firebase_config) ||
+  readEnv('VITE_FIREBASE_CONFIG', null);
+
+const appId = typeof __app_id !== 'undefined'
+  ? __app_id
+  : (readEnv('VITE_APP_ID', 'english-100-knock-v3'));
+const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : {};
+const hasFirebaseConfig = Boolean(firebaseConfigRaw);
+
+let app = null;
+let auth = null;
+let db = null;
+if (hasFirebaseConfig) {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+}
+
+const localKey = (suffix) => `${appId}:${suffix}`;
+const loadLocalJson = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+};
+const saveLocalJson = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {}
+};
+const getLocalUserId = () => {
+  let uid = localStorage.getItem(localKey('uid'));
+  if (!uid) {
+    const rand = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    uid = rand;
+    localStorage.setItem(localKey('uid'), uid);
+  }
+  return uid;
+};
 
 const GAME_DURATION = 60;
 const MAX_Q_POINTS = 150;
@@ -255,6 +308,21 @@ export default function App() {
 
   // --- Auth & Firestore Login ---
   useEffect(() => {
+    if (!hasFirebaseConfig) {
+      const uid = getLocalUserId();
+      const stats = loadLocalJson(localKey('stats'), {});
+      setUser({ uid });
+      if (stats.nickname) {
+        setNickname(stats.nickname);
+        setTotalScore(Number(stats.totalScore) || 0);
+        setTotalAttempts(Number(stats.totalAttempts) || 0);
+        setBestSum(Number(stats.totalBestScore) || 0);
+        setScreen('TITLE');
+      } else {
+        setScreen('NICKNAME');
+      }
+      return;
+    }
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -289,6 +357,15 @@ export default function App() {
   // --- Data Subscription ---
   useEffect(() => {
     if (!user) return;
+    if (!hasFirebaseConfig) {
+      const historyLocal = loadLocalJson(localKey('history'), []);
+      const leaderboardLocal = loadLocalJson(localKey('leaderboard'), []);
+      const globalsLocal = loadLocalJson(localKey('globals'), []);
+      setHistory(historyLocal);
+      setCourseLeaderboard(leaderboardLocal);
+      setGlobalLeaderboard(globalsLocal);
+      return;
+    }
     const unsubH = onSnapshot(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), (s) => {
       const logs = s.docs.map(d => ({ id: d.id, ...d.data() }));
       setHistory(logs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
@@ -327,6 +404,24 @@ export default function App() {
     if (name.length < 2) return;
     localStorage.setItem('knock_nickname', name);
     setScreen('TITLE');
+    if (!hasFirebaseConfig) {
+      const stats = loadLocalJson(localKey('stats'), {});
+      const nextStats = { ...stats, nickname: name, updatedAt: Date.now() };
+      saveLocalJson(localKey('stats'), nextStats);
+      const globals = loadLocalJson(localKey('globals'), []);
+      const nextGlobals = globals.filter(g => g.userId !== user?.uid);
+      nextGlobals.push({
+        userId: user?.uid,
+        nickname: name,
+        totalScore: Number(nextStats.totalScore) || 0,
+        totalAttempts: Number(nextStats.totalAttempts) || 0,
+        totalBestScore: Number(nextStats.totalBestScore) || 0,
+        updatedAt: Date.now()
+      });
+      saveLocalJson(localKey('globals'), nextGlobals);
+      setGlobalLeaderboard(nextGlobals);
+      return;
+    }
     if (user) {
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'stats'), { nickname: name, updatedAt: serverTimestamp() }, { merge: true });
       await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'global_stats', user.uid), { userId: user.uid, nickname: name }, { merge: true });
@@ -394,6 +489,62 @@ export default function App() {
     setTotalAttempts(prev => prev + 1);
     
     if (!user) return;
+    if (!hasFirebaseConfig) {
+      const stats = loadLocalJson(localKey('stats'), {});
+      const highScores = { ...(stats.highScores || {}) };
+      const currentBest = highScores[selectedCategory] || 0;
+      if (final > currentBest && final > 0) {
+        setIsNewRecord(true);
+        highScores[selectedCategory] = final;
+      }
+      const newBestSum = Object.values(highScores).reduce((acc, v) => acc + (Number(v) || 0), 0);
+      setBestSum(newBestSum);
+
+      const nextStats = {
+        ...stats,
+        nickname,
+        totalScore: (Number(stats.totalScore) || 0) + final,
+        totalAttempts: (Number(stats.totalAttempts) || 0) + 1,
+        totalBestScore: newBestSum,
+        highScores,
+        updatedAt: Date.now()
+      };
+      saveLocalJson(localKey('stats'), nextStats);
+
+      const leaderboard = loadLocalJson(localKey('leaderboard'), []);
+      const filtered = leaderboard.filter(e => !(e.userId === user.uid && e.category === selectedCategory));
+      filtered.push({
+        userId: user.uid,
+        nickname,
+        score: highScores[selectedCategory] || 0,
+        category: selectedCategory,
+        updatedAt: Date.now()
+      });
+      saveLocalJson(localKey('leaderboard'), filtered);
+      setCourseLeaderboard(filtered);
+
+      const globals = loadLocalJson(localKey('globals'), []);
+      const nextGlobals = globals.filter(g => g.userId !== user.uid);
+      nextGlobals.push({
+        userId: user.uid,
+        nickname,
+        totalScore: nextStats.totalScore,
+        totalAttempts: nextStats.totalAttempts,
+        totalBestScore: nextStats.totalBestScore,
+        updatedAt: Date.now()
+      });
+      saveLocalJson(localKey('globals'), nextGlobals);
+      setGlobalLeaderboard(nextGlobals);
+
+      const history = loadLocalJson(localKey('history'), []);
+      const nextHistory = [
+        { category: selectedCategory, score: final, createdAt: Date.now() },
+        ...history
+      ];
+      saveLocalJson(localKey('history'), nextHistory);
+      setHistory(nextHistory);
+      return;
+    }
     try {
       const statsRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'stats');
       const snap = await getDoc(statsRef);
@@ -598,7 +749,13 @@ export default function App() {
               <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
                 {history.map((log, i) => (
                   <div key={i} className="flex justify-between items-center text-[11px] p-3 bg-slate-50 rounded-2xl font-bold">
-                    <span className="text-slate-400 font-black">{(log.createdAt?.toDate ? `${log.createdAt.toDate().getMonth()+1}/${log.createdAt.toDate().getDate()}` : '-')}</span>
+                    <span className="text-slate-400 font-black">{
+                      log.createdAt?.toDate
+                        ? `${log.createdAt.toDate().getMonth()+1}/${log.createdAt.toDate().getDate()}`
+                        : (typeof log.createdAt === 'number'
+                          ? `${new Date(log.createdAt).getMonth()+1}/${new Date(log.createdAt).getDate()}`
+                          : '-')
+                    }</span>
                     <span className="truncate flex-1 px-4 text-slate-600 italic">{log.category}</span>
                     <span className="text-indigo-700 font-black">{(log.score || 0).toLocaleString()} pt</span>
                   </div>
