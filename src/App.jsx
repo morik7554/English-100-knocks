@@ -250,6 +250,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [nickname, setNickname] = useState(localStorage.getItem('knock_nickname') || "");
   const [screen, setScreen] = useState('LOADING'); 
+  const [runtimeError, setRuntimeError] = useState(null);
   
   const [totalScore, setTotalScore] = useState(0); 
   const [totalAttempts, setTotalAttempts] = useState(0); 
@@ -292,6 +293,29 @@ export default function App() {
       window.speechSynthesis.onvoiceschanged = initVoice;
       initVoice();
     }
+  }, []);
+
+  useEffect(() => {
+    const onError = (event) => {
+      const err = event?.error;
+      setRuntimeError({
+        message: event?.message || (err && err.message) || String(err || event),
+        stack: err?.stack || null
+      });
+    };
+    const onRejection = (event) => {
+      const reason = event?.reason;
+      setRuntimeError({
+        message: reason?.message || String(reason || event),
+        stack: reason?.stack || null
+      });
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
   }, []);
 
   const speak = useCallback((text) => {
@@ -806,6 +830,15 @@ export default function App() {
                 <button onClick={() => { setIsQuitModalOpen(false); setScreen('TITLE'); }} className="bg-rose-500 py-4 rounded-2xl font-black text-white shadow-lg">中断する</button>
               </div>
             </div>
+          </div>
+        )}
+        {runtimeError && (
+          <div className="absolute inset-0 z-[200] bg-black/80 text-white p-4 overflow-auto">
+            <div className="text-xs font-bold uppercase tracking-widest text-rose-300 mb-2">Runtime Error</div>
+            <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
+              {runtimeError.message}
+              {runtimeError.stack ? `\n\n${runtimeError.stack}` : ''}
+            </pre>
           </div>
         )}
       </div>
