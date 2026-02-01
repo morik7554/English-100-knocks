@@ -141,11 +141,22 @@ const firebaseConfigRaw =
   (typeof __firebase_config !== 'undefined' && __firebase_config) ||
   readEnv('VITE_FIREBASE_CONFIG', null);
 
+const forceLocal = String(readEnv('VITE_LOCAL_ONLY', 'false')).toLowerCase() === 'true';
+
 const appId = typeof __app_id !== 'undefined'
   ? __app_id
   : (readEnv('VITE_APP_ID', 'english-100-knock-v3'));
-const firebaseConfig = firebaseConfigRaw ? JSON.parse(firebaseConfigRaw) : {};
-const hasFirebaseConfig = Boolean(firebaseConfigRaw);
+let firebaseConfig = {};
+let hasFirebaseConfig = false;
+if (!forceLocal && firebaseConfigRaw) {
+  try {
+    firebaseConfig = JSON.parse(firebaseConfigRaw);
+    hasFirebaseConfig = true;
+  } catch (e) {
+    firebaseConfig = {};
+    hasFirebaseConfig = false;
+  }
+}
 
 let app = null;
 let auth = null;
