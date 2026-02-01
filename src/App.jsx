@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  onAuthStateChanged, 
-  signInWithCustomToken 
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+  signInWithCustomToken
 } from 'firebase/auth';
-import { 
-  getFirestore, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  increment, 
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  addDoc,
+  onSnapshot,
+  increment,
   serverTimestamp
 } from 'firebase/firestore';
 
@@ -146,6 +146,7 @@ const forceLocal = String(readEnv('VITE_LOCAL_ONLY', 'false')).toLowerCase() ===
 const appId = typeof __app_id !== 'undefined'
   ? __app_id
   : (readEnv('VITE_APP_ID', 'english-100-knock-v3'));
+
 let firebaseConfig = {};
 let hasFirebaseConfig = false;
 if (!forceLocal && firebaseConfigRaw) {
@@ -260,28 +261,27 @@ const RankingList = ({ list, type, currentUserId }) => (
 export default function App() {
   const [user, setUser] = useState(null);
   const [nickname, setNickname] = useState(localStorage.getItem('knock_nickname') || "");
-  const [screen, setScreen] = useState('LOADING'); 
-  const [runtimeError, setRuntimeError] = useState(null);
-  
-  const [totalScore, setTotalScore] = useState(0); 
-  const [totalAttempts, setTotalAttempts] = useState(0); 
-  const [bestSum, setBestSum] = useState(0); 
+  const [screen, setScreen] = useState('LOADING');
+
+  const [totalScore, setTotalScore] = useState(0);
+  const [totalAttempts, setTotalAttempts] = useState(0);
+  const [bestSum, setBestSum] = useState(0);
   const [history, setHistory] = useState([]);
   const [courseLeaderboard, setCourseLeaderboard] = useState([]);
   const [globalLeaderboard, setGlobalLeaderboard] = useState([]);
-  const [globalRankTab, setGlobalRankTab] = useState('best'); 
-  
+  const [globalRankTab, setGlobalRankTab] = useState('best');
+
   const [isQuitModalOpen, setIsQuitModalOpen] = useState(false);
-  const [isNewRecord, setIsNewRecord] = useState(false); 
+  const [isNewRecord, setIsNewRecord] = useState(false);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(GAME_DURATION);
   const [sessionScore, setSessionScore] = useState(0);
   const [combo, setCombo] = useState(0);
-  const [userWords, setUserWords] = useState([]); 
-  const [selectableWords, setSelectableWords] = useState([]); 
-  const [feedback, setFeedback] = useState(null); 
+  const [userWords, setUserWords] = useState([]);
+  const [selectableWords, setSelectableWords] = useState([]);
+  const [feedback, setFeedback] = useState(null);
   const [qStartTime, setQStartTime] = useState(0);
-  
+
   const [selectedGrade, setSelectedGrade] = useState(2);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [rankViewCategory, setRankViewCategory] = useState(null);
@@ -293,10 +293,10 @@ export default function App() {
     const initVoice = () => {
       if (!window.speechSynthesis) return;
       const vs = window.speechSynthesis.getVoices();
-      const googleVoice = vs.find(v => v.name === "Google US English") || 
+      const googleVoice = vs.find(v => v.name === "Google US English") ||
                           vs.find(v => v.name.includes("Google US English"));
       const bestFallback = vs.find(v => v.name.includes("Natural") && v.lang.startsWith("en-US")) ||
-                           vs.find(v => v.lang.startsWith("en-US")) || 
+                           vs.find(v => v.lang.startsWith("en-US")) ||
                            vs[0];
       setNativeVoice(googleVoice || bestFallback);
     };
@@ -304,29 +304,6 @@ export default function App() {
       window.speechSynthesis.onvoiceschanged = initVoice;
       initVoice();
     }
-  }, []);
-
-  useEffect(() => {
-    const onError = (event) => {
-      const err = event?.error;
-      setRuntimeError({
-        message: event?.message || (err && err.message) || String(err || event),
-        stack: err?.stack || null
-      });
-    };
-    const onRejection = (event) => {
-      const reason = event?.reason;
-      setRuntimeError({
-        message: reason?.message || String(reason || event),
-        stack: reason?.stack || null
-      });
-    };
-    window.addEventListener('error', onError);
-    window.addEventListener('unhandledrejection', onRejection);
-    return () => {
-      window.removeEventListener('error', onError);
-      window.removeEventListener('unhandledrejection', onRejection);
-    };
   }, []);
 
   const speak = useCallback((text) => {
@@ -522,7 +499,7 @@ export default function App() {
     const final = sessionScore;
     setTotalScore(prev => prev + final);
     setTotalAttempts(prev => prev + 1);
-    
+
     if (!user) return;
     if (!hasFirebaseConfig) {
       const stats = loadLocalJson(localKey('stats'), {});
@@ -571,10 +548,10 @@ export default function App() {
       saveLocalJson(localKey('globals'), nextGlobals);
       setGlobalLeaderboard(nextGlobals);
 
-      const history = loadLocalJson(localKey('history'), []);
+      const historyLocal = loadLocalJson(localKey('history'), []);
       const nextHistory = [
         { category: selectedCategory, score: final, createdAt: Date.now() },
-        ...history
+        ...historyLocal
       ];
       saveLocalJson(localKey('history'), nextHistory);
       setHistory(nextHistory);
@@ -590,22 +567,22 @@ export default function App() {
       if (final > currentBest && final > 0) {
         setIsNewRecord(true);
         highScores[selectedCategory] = final;
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', `${user.uid}_${selectedCategory}`), { 
-          userId: user.uid, nickname, score: final, category: selectedCategory, updatedAt: serverTimestamp() 
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', `${user.uid}_${selectedCategory}`), {
+          userId: user.uid, nickname, score: final, category: selectedCategory, updatedAt: serverTimestamp()
         });
       }
       const newBestSum = Object.values(highScores).reduce((acc, v) => acc + (Number(v) || 0), 0);
       setBestSum(newBestSum);
 
       await Promise.all([
-        setDoc(statsRef, { 
-          nickname, totalScore: (d.totalScore || 0) + final, totalAttempts: increment(1), totalBestScore: newBestSum, highScores: highScores, updatedAt: serverTimestamp() 
+        setDoc(statsRef, {
+          nickname, totalScore: (d.totalScore || 0) + final, totalAttempts: increment(1), totalBestScore: newBestSum, highScores: highScores, updatedAt: serverTimestamp()
         }, { merge: true }),
-        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'global_stats', user.uid), { 
-          userId: user.uid, nickname, totalScore: (d.totalScore || 0) + final, totalAttempts: (d.totalAttempts || 0) + 1, totalBestScore: newBestSum, updatedAt: serverTimestamp() 
+        setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'global_stats', user.uid), {
+          userId: user.uid, nickname, totalScore: (d.totalScore || 0) + final, totalAttempts: (d.totalAttempts || 0) + 1, totalBestScore: newBestSum, updatedAt: serverTimestamp()
         }, { merge: true }),
-        addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), { 
-          category: selectedCategory, score: final, createdAt: serverTimestamp() 
+        addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), {
+          category: selectedCategory, score: final, createdAt: serverTimestamp()
         })
       ]);
     } catch (e) { console.error(e); }
@@ -830,7 +807,7 @@ export default function App() {
           {screen === 'GAME' && <button onClick={() => setIsQuitModalOpen(true)} className="ml-2 text-2xl font-bold p-1">×</button>}
         </div>
         <div className="flex-1 overflow-hidden relative p-4 flex flex-col">{renderScreen()}</div>
-        
+
         {isQuitModalOpen && (
           <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-8">
             <div className="bg-white rounded-[2.5rem] p-8 w-full text-center shadow-2xl border-4 border-indigo-50 animate-in zoom-in">
@@ -841,15 +818,6 @@ export default function App() {
                 <button onClick={() => { setIsQuitModalOpen(false); setScreen('TITLE'); }} className="bg-rose-500 py-4 rounded-2xl font-black text-white shadow-lg">中断する</button>
               </div>
             </div>
-          </div>
-        )}
-        {runtimeError && (
-          <div className="absolute inset-0 z-[200] bg-black/80 text-white p-4 overflow-auto">
-            <div className="text-xs font-bold uppercase tracking-widest text-rose-300 mb-2">Runtime Error</div>
-            <pre className="whitespace-pre-wrap text-sm font-mono leading-relaxed">
-              {runtimeError.message}
-              {runtimeError.stack ? `\n\n${runtimeError.stack}` : ''}
-            </pre>
           </div>
         )}
       </div>
@@ -881,7 +849,7 @@ function CountdownTimer({ onComplete }) {
     if (count > 1) {
       const t = setTimeout(() => setCount(count - 1), 1000);
       return () => clearTimeout(t);
-    } else { 
+    } else {
       const t = setTimeout(() => { if (onComplete) onComplete(); }, 1000);
       return () => clearTimeout(t);
     }
