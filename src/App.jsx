@@ -37,6 +37,13 @@ const INTERNAL_DATA = {
     { ja: "彼女は2年間ここに住んでいます。", en: "She has lived here for two years .", comment: "継続用法" },
     { ja: "あなたはこれまでに京都に行ったことがありますか？", en: "Have you ever been to Kyoto ?", comment: "疑問文" },
     { ja: "私はまだ宿題を終えていません。", en: "I have not finished my homework yet .", comment: "否定文" }
+  ],
+  "3年 現在完了進行形": [
+    { ja: "私は2時間ずっと英語を勉強しています。", en: "I have been studying English for two hours .", comment: "for + 時間" },
+    { ja: "彼は朝からずっと走っています。", en: "He has been running since this morning .", comment: "since + 時点" },
+    { ja: "あなたはどのくらいずっとピアノを練習しているのですか？", en: "How long have you been practicing the piano ?", comment: "How long ~ ?" },
+    { ja: "彼女は今もずっとその本を読んでいます。", en: "She has been reading the book .", comment: "継続している動作" },
+    { ja: "私たちは30分ずっと彼を待っています。", en: "We have been waiting for him for thirty minutes .", comment: "wait for + 人" }
   ]
 };
 
@@ -587,6 +594,23 @@ export default function App() {
         </div>
       </div>
       
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap');
+        body { margin: 0; padding: 0; font-family: 'M PLUS Rounded 1c', sans-serif; background: #e0e7ff; }
+        .custom-scrollbar::-webkit-scrollbar { height: 4px; width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .animate-in { animation: 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67) both; }
+        @keyframes zoomIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+        .zoom-in { animation-name: zoomIn; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .fade-in { animation-name: fadeIn; }
+        @keyframes slideInFromBottom { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .slide-in-from-bottom { animation-name: slideInFromBottom; }
+        @keyframes rainbowPulse { 0% { background-color: rgba(251, 191, 36, 0.1); } 50% { background-color: rgba(99, 102, 241, 0.1); } 100% { background-color: rgba(251, 191, 36, 0.1); } }
+        .animate-rainbow-pulse { animation: rainbowPulse 3s infinite; }
+        @keyframes shine { 0% { transform: skewX(-12deg) translateX(-100%); } 100% { transform: skewX(-12deg) translateX(200%); } }
+        .animate-shine { animation: shine 2s infinite linear; }
+      `}</style>
     </div>
   );
 }
